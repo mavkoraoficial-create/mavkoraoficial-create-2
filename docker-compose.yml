@@ -209,7 +209,9 @@ services:
   # llamar a Laravel como http://nginx/api/bot/... sin salir a internet.
   n8n:
 
-    image: docker.n8n.io/n8nio/n8n:latest
+    # Se usa Docker Hub y no el registro propio de n8n (docker.n8n.io) porque
+    # ese dominio no resuelve en todas las redes y tumba el build entero.
+    image: n8nio/n8n:latest
 
     container_name: mavkora_n8n
 

@@ -85,7 +85,11 @@ RUN docker-php-ext-install \
 # Redis
 ###############################################################
 
-RUN pecl install redis
+# El catalogo de PECL que trae la imagen base esta desactualizado y hace que
+# 'pecl install redis' falle con "No releases available". Refrescarlo primero
+# lo resuelve; van en el mismo RUN para que compartan capa y cache.
+RUN pecl channel-update pecl.php.net \
+    && pecl install redis
 
 RUN docker-php-ext-enable redis
 
