@@ -1,0 +1,5 @@
+<div id="loader">
+
+    <div class="spinner-border text-primary"></div>
+
+</div>

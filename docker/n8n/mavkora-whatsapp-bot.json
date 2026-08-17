@@ -1,0 +1,433 @@
+{
+  "name": "Mavkora · Chatbot de WhatsApp",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "whatsapp-mavkora",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000001",
+      "name": "Verificación de Meta",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-460, -200],
+      "webhookId": "b1000000-0000-4000-8000-000000000001",
+      "notes": "Meta llama aquí una sola vez, al guardar el webhook en el panel de desarrolladores."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1000000-0001",
+              "leftValue": "={{ $json.query['hub.verify_token'] }}",
+              "rightValue": "REEMPLAZAR_CON_WHATSAPP_VERIFY_TOKEN",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000002",
+      "name": "¿Token correcto?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-240, -200],
+      "notes": "Pega aquí el mismo valor que pusiste en WHATSAPP_VERIFY_TOKEN del .env de Laravel."
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $('Verificación de Meta').first().json.query['hub.challenge'] }}",
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000003",
+      "name": "Devolver challenge",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [-20, -300],
+      "notes": "Meta exige que se devuelva el hub.challenge tal cual, en texto plano."
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "Token de verificación inválido.",
+        "options": { "responseCode": 403 }
+      },
+      "id": "a1000000-0000-4000-8000-000000000004",
+      "name": "Rechazar verificación",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [-20, -120]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-mavkora",
+        "responseMode": "onReceived",
+        "options": { "responseCode": 200 }
+      },
+      "id": "a1000000-0000-4000-8000-000000000005",
+      "name": "Mensajes de WhatsApp",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-460, 120],
+      "webhookId": "b1000000-0000-4000-8000-000000000002",
+      "notes": "Responde 200 de inmediato. Si Meta no recibe el 200 en pocos segundos reintenta el envío, y el cliente recibiría la respuesta duplicada."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Meta entrega el mensaje anidado en entry[0].changes[0].value.\n// Aquí se aplana a la forma que espera la API de Laravel.\nconst raw = $input.first().json;\nconst body = raw.body ?? raw;\n\nconst value = body?.entry?.[0]?.changes?.[0]?.value;\nconst message = value?.messages?.[0];\n\n// Los webhooks de estado (enviado / entregado / leído) no traen 'messages'.\n// Sin este corte el bot respondería a sus propios acuses de recibo.\nif (!message) {\n  return [{ json: { skip: true, motivo: 'webhook de estado, no es un mensaje' } }];\n}\n\nconst contact = value?.contacts?.[0];\n\nlet text = '';\nlet replyId = null;\n\nswitch (message.type) {\n  case 'text':\n    text = message.text?.body ?? '';\n    break;\n\n  case 'interactive':\n    // El cliente tocó un botón o eligió una fila de la lista.\n    // El id es lo que interpreta la máquina de estados; el título es solo\n    // lo que el cliente vio en pantalla.\n    if (message.interactive?.type === 'button_reply') {\n      replyId = message.interactive.button_reply?.id ?? null;\n      text = message.interactive.button_reply?.title ?? '';\n    } else if (message.interactive?.type === 'list_reply') {\n      replyId = message.interactive.list_reply?.id ?? null;\n      text = message.interactive.list_reply?.title ?? '';\n    }\n    break;\n\n  case 'button':\n    // Botón de una plantilla, formato distinto al interactivo.\n    text = message.button?.text ?? '';\n    replyId = message.button?.payload ?? null;\n    break;\n\n  default:\n    // Audio, imagen, ubicación, documento... El bot todavía no los interpreta,\n    // pero se registran igual para que el asesor los vea en el panel.\n    text = '';\n}\n\nreturn [{\n  json: {\n    skip: false,\n    wa_id: message.from,\n    profile_name: contact?.profile?.name ?? null,\n    wa_message_id: message.id,\n    type: message.type,\n    text,\n    reply_id: replyId,\n  },\n}];"
+      },
+      "id": "a1000000-0000-4000-8000-000000000006",
+      "name": "Normalizar mensaje",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-240, 120]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1000000-0002",
+              "leftValue": "={{ $json.skip ? 'si' : 'no' }}",
+              "rightValue": "no",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000007",
+      "name": "¿Es un mensaje real?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-20, 120]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://nginx/api/bot/incoming",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": { "timeout": 20000 }
+      },
+      "id": "a1000000-0000-4000-8000-000000000008",
+      "name": "Laravel: procesar mensaje",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [200, 120],
+      "credentials": {
+        "httpHeaderAuth": { "id": "REEMPLAZAR", "name": "Mavkora Bot API" }
+      },
+      "notes": "Aquí vive el cerebro del bot. Laravel guarda el mensaje, avanza la máquina de estados y devuelve qué responder. La URL usa 'nginx' porque es el nombre del servicio dentro de la red de Docker."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1000000-0003",
+              "leftValue": "={{ $json.needs_ai ? 'si' : 'no' }}",
+              "rightValue": "si",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000009",
+      "name": "¿Necesita IA?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [420, 120],
+      "notes": "Laravel pide IA solo cuando el cliente escribió algo libre que no encajó en ningún paso del menú. Todo lo demás sale gratis."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Arma el cuerpo de la petición a la API de Claude.\nconst laravel = $input.first().json;\nconst ai = laravel.ai ?? {};\n\n// El historial ya viene ordenado y termina con el mensaje actual del cliente.\nlet history = (ai.history ?? []).filter(\n  (m) => typeof m.content === 'string' && m.content.trim() !== ''\n);\n\n// La conversación debe empezar por el usuario: si la ventana de 10 mensajes\n// cortó justo en una respuesta del bot, se descartan esas primeras.\nwhile (history.length > 0 && history[0].role !== 'user') {\n  history.shift();\n}\n\n// Y debe terminar por el usuario, que es a quien Claude tiene que contestar.\nif (history.length === 0 || history[history.length - 1].role !== 'user') {\n  history.push({ role: 'user', content: ai.message ?? '' });\n}\n\nreturn [{\n  json: {\n    conversation_id: laravel.conversation_id,\n    requestBody: {\n      model: 'claude-opus-5',\n      max_tokens: 2048,\n      // Esfuerzo bajo: son respuestas cortas de chat, no razonamiento profundo.\n      // Baja la latencia y el costo sin perder calidad en este caso de uso.\n      output_config: { effort: 'low' },\n      system: ai.system ?? '',\n      messages: history,\n    },\n  },\n}];"
+      },
+      "id": "a1000000-0000-4000-8000-000000000010",
+      "name": "Preparar consulta a Claude",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [640, 20]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.requestBody) }}",
+        "options": { "timeout": 60000 }
+      },
+      "id": "a1000000-0000-4000-8000-000000000011",
+      "name": "Claude",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [860, 20],
+      "credentials": {
+        "httpHeaderAuth": { "id": "REEMPLAZAR", "name": "Anthropic API Key" }
+      },
+      "notes": "La credencial debe ser de tipo Header Auth con nombre 'x-api-key' y el valor de tu clave de Anthropic."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extrae el texto de la respuesta de Claude.\nconst res = $input.first().json;\n\n// Claude Opus 5 razona por defecto, así que el primer bloque del contenido\n// suele ser de tipo 'thinking' con texto vacío. Hay que filtrar por el bloque\n// de tipo 'text': leer content[0] devolvería una cadena vacía.\nconst text = (res.content ?? [])\n  .filter((b) => b.type === 'text')\n  .map((b) => b.text)\n  .join('\\n')\n  .trim();\n\n// Los clasificadores de seguridad pueden declinar una consulta. No llega como\n// error HTTP: llega un 200 con stop_reason 'refusal'. Ante eso, mejor pasar a\n// un humano que dejar al cliente sin respuesta.\nif (res.stop_reason === 'refusal' || text === '') {\n  return [{\n    json: {\n      reply: {\n        kind: 'text',\n        body: 'Prefiero que esta consulta la vea un asesor de Mavkora 🙌 Escribe *asesor* y te conecto con una persona del equipo, o *menu* para volver al inicio.',\n      },\n      generated_by: 'flow',\n    },\n  }];\n}\n\nreturn [{ json: { reply: { kind: 'text', body: text }, generated_by: 'ai' } }];"
+      },
+      "id": "a1000000-0000-4000-8000-000000000012",
+      "name": "Extraer respuesta de Claude",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1080, 20]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Traduce la respuesta genérica de Laravel al formato de la Cloud API.\nconst entrada = $input.first().json;\nconst normalizado = $('Normalizar mensaje').first().json;\nconst laravel = $('Laravel: procesar mensaje').first().json;\n\n// Si venimos de la rama de IA, el texto llega en la entrada;\n// si no, se usa la respuesta que ya calculó Laravel.\nconst reply = entrada.reply ?? laravel.reply;\nconst generadoPor = entrada.generated_by ?? 'flow';\n\nconst to = normalizado.wa_id;\nconst base = { messaging_product: 'whatsapp', recipient_type: 'individual', to };\n\n// 'none' significa que el bot debe callarse: un asesor tomó la conversación,\n// o el mensaje era un reintento de Meta que ya se había respondido.\nif (!reply || reply.kind === 'none') {\n  return [{ json: { send: false, motivo: 'sin respuesta que enviar' } }];\n}\n\nlet payload;\n\nif (reply.kind === 'text') {\n  payload = { ...base, type: 'text', text: { preview_url: false, body: reply.body } };\n} else if (reply.kind === 'buttons') {\n  payload = {\n    ...base,\n    type: 'interactive',\n    interactive: {\n      type: 'button',\n      body: { text: reply.body },\n      ...(reply.footer ? { footer: { text: reply.footer } } : {}),\n      action: {\n        buttons: (reply.buttons ?? []).map((b) => ({\n          type: 'reply',\n          reply: { id: b.id, title: b.title },\n        })),\n      },\n    },\n  };\n} else if (reply.kind === 'list') {\n  payload = {\n    ...base,\n    type: 'interactive',\n    interactive: {\n      type: 'list',\n      body: { text: reply.body },\n      ...(reply.footer ? { footer: { text: reply.footer } } : {}),\n      action: {\n        button: reply.button,\n        // Meta rechaza un 'title' nulo en las secciones, así que se omite.\n        sections: (reply.sections ?? []).map((s) => ({\n          ...(s.title ? { title: s.title } : {}),\n          rows: s.rows,\n        })),\n      },\n    },\n  };\n} else {\n  return [{ json: { send: false, motivo: 'tipo de respuesta desconocido: ' + reply.kind } }];\n}\n\nreturn [{\n  json: {\n    send: true,\n    payload,\n    conversation_id: laravel.conversation_id,\n    generated_by: generadoPor,\n    body_texto: reply.body ?? '',\n    tipo: reply.kind,\n  },\n}];"
+      },
+      "id": "a1000000-0000-4000-8000-000000000013",
+      "name": "Construir mensaje de WhatsApp",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1300, 120]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1000000-0004",
+              "leftValue": "={{ $json.send ? 'si' : 'no' }}",
+              "rightValue": "si",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000014",
+      "name": "¿Hay algo que enviar?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1520, 120]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v21.0/REEMPLAZAR_PHONE_NUMBER_ID/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "content-type", "value": "application/json" }]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.payload) }}",
+        "options": { "timeout": 20000 }
+      },
+      "id": "a1000000-0000-4000-8000-000000000015",
+      "name": "Enviar por WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1740, 40],
+      "credentials": {
+        "httpHeaderAuth": { "id": "REEMPLAZAR", "name": "Meta WhatsApp Token" }
+      },
+      "notes": "Reemplaza REEMPLAZAR_PHONE_NUMBER_ID por el ID del número que te da Meta (no es el número de teléfono). La credencial es Header Auth con nombre 'Authorization' y valor 'Bearer TU_TOKEN'."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://nginx/api/bot/sent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ conversation_id: $('Construir mensaje de WhatsApp').first().json.conversation_id, wa_message_id: $json.messages?.[0]?.id ?? null, type: $('Construir mensaje de WhatsApp').first().json.tipo, body: $('Construir mensaje de WhatsApp').first().json.body_texto, generated_by: $('Construir mensaje de WhatsApp').first().json.generated_by }) }}",
+        "options": { "timeout": 20000 }
+      },
+      "id": "a1000000-0000-4000-8000-000000000016",
+      "name": "Laravel: registrar envío",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1960, 40],
+      "credentials": {
+        "httpHeaderAuth": { "id": "REEMPLAZAR", "name": "Mavkora Bot API" }
+      },
+      "notes": "Deja el hilo completo en el panel: sin esto solo se verían los mensajes del cliente."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1000000-0005",
+              "leftValue": "={{ $json.notify ? 'si' : 'no' }}",
+              "rightValue": "si",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000017",
+      "name": "¿Avisar al equipo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [420, 400],
+      "notes": "Laravel marca notify cuando pasa algo que una persona debe saber: lead nuevo, reunión agendada o alguien pidiendo un asesor."
+    },
+    {
+      "parameters": {
+        "fromEmail": "bot@mavkora.com",
+        "toEmail": "REEMPLAZAR_CORREO_DEL_EQUIPO",
+        "subject": "=[Mavkora Bot] {{ $json.notify.type === 'lead' ? 'Nuevo lead' : ($json.notify.type === 'appointment' ? 'Reunión agendada' : ($json.notify.type === 'handoff' ? 'Cliente pide un asesor' : 'Mensaje en espera')) }}",
+        "emailFormat": "text",
+        "text": "={{ JSON.stringify($json.notify, null, 2) }}\n\n---\nPanel: revisa el detalle en /admin/leads y /admin/conversaciones",
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000018",
+      "name": "Correo al equipo",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [640, 400],
+      "notes": "Para probar en local usa mailpit: host 'mailpit', puerto 1025, sin usuario ni clave. Los correos se ven en http://localhost:8025"
+    },
+    {
+      "parameters": {
+        "content": "## Chatbot de WhatsApp de Mavkora\n\n**Antes de activar, reemplaza:**\n1. `REEMPLAZAR_CON_WHATSAPP_VERIFY_TOKEN` en «¿Token correcto?»\n2. `REEMPLAZAR_PHONE_NUMBER_ID` en «Enviar por WhatsApp»\n3. `REEMPLAZAR_CORREO_DEL_EQUIPO` en «Correo al equipo»\n\n**Credenciales a crear (todas de tipo Header Auth):**\n- `Mavkora Bot API` → nombre `X-Bot-Key`, valor = BOT_API_KEY del .env\n- `Anthropic API Key` → nombre `x-api-key`, valor = tu clave de Anthropic\n- `Meta WhatsApp Token` → nombre `Authorization`, valor = `Bearer TU_TOKEN`\n\nGuía completa en `docs/CHATBOT-WHATSAPP.md`",
+        "height": 320,
+        "width": 420,
+        "color": 4
+      },
+      "id": "a1000000-0000-4000-8000-000000000019",
+      "name": "Léeme",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-900, 80]
+    }
+  ],
+  "connections": {
+    "Verificación de Meta": {
+      "main": [[{ "node": "¿Token correcto?", "type": "main", "index": 0 }]]
+    },
+    "¿Token correcto?": {
+      "main": [
+        [{ "node": "Devolver challenge", "type": "main", "index": 0 }],
+        [{ "node": "Rechazar verificación", "type": "main", "index": 0 }]
+      ]
+    },
+    "Mensajes de WhatsApp": {
+      "main": [[{ "node": "Normalizar mensaje", "type": "main", "index": 0 }]]
+    },
+    "Normalizar mensaje": {
+      "main": [[{ "node": "¿Es un mensaje real?", "type": "main", "index": 0 }]]
+    },
+    "¿Es un mensaje real?": {
+      "main": [[{ "node": "Laravel: procesar mensaje", "type": "main", "index": 0 }], []]
+    },
+    "Laravel: procesar mensaje": {
+      "main": [
+        [
+          { "node": "¿Necesita IA?", "type": "main", "index": 0 },
+          { "node": "¿Avisar al equipo?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "¿Necesita IA?": {
+      "main": [
+        [{ "node": "Preparar consulta a Claude", "type": "main", "index": 0 }],
+        [{ "node": "Construir mensaje de WhatsApp", "type": "main", "index": 0 }]
+      ]
+    },
+    "Preparar consulta a Claude": {
+      "main": [[{ "node": "Claude", "type": "main", "index": 0 }]]
+    },
+    "Claude": {
+      "main": [[{ "node": "Extraer respuesta de Claude", "type": "main", "index": 0 }]]
+    },
+    "Extraer respuesta de Claude": {
+      "main": [[{ "node": "Construir mensaje de WhatsApp", "type": "main", "index": 0 }]]
+    },
+    "Construir mensaje de WhatsApp": {
+      "main": [[{ "node": "¿Hay algo que enviar?", "type": "main", "index": 0 }]]
+    },
+    "¿Hay algo que enviar?": {
+      "main": [[{ "node": "Enviar por WhatsApp", "type": "main", "index": 0 }], []]
+    },
+    "Enviar por WhatsApp": {
+      "main": [[{ "node": "Laravel: registrar envío", "type": "main", "index": 0 }]]
+    },
+    "¿Avisar al equipo?": {
+      "main": [[{ "node": "Correo al equipo", "type": "main", "index": 0 }], []]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all"
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "mavkora"
+  },
+  "tags": []
+}

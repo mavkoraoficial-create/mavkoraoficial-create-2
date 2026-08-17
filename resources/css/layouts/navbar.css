@@ -1,0 +1,9 @@
+.main-header {
+
+    border: none;
+
+    box-shadow: var(--shadow-sm);
+
+    background: #fff;
+
+}
