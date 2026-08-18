@@ -1,0 +1,69 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "1. Arrancar Mavkora",
+      "detail": "Levanta los 8 contenedores (web, base de datos, n8n...)",
+      "type": "shell",
+      "command": "docker compose up -d && docker compose ps",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+    },
+    {
+      "label": "2. Probar el bot (conversacion de ejemplo)",
+      "detail": "Corre solo una conversacion completa. Usalo despues de cambiar algo del bot.",
+      "type": "shell",
+      "command": "docker compose exec app php artisan mavkora:bot-demo --guion",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+    },
+    {
+      "label": "3. Conversar con el bot",
+      "detail": "Modo interactivo: escribes tu y el bot responde. Escribe salir para terminar.",
+      "type": "shell",
+      "command": "docker compose exec app php artisan mavkora:bot-demo --reset",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true, "echo": false }
+    },
+    {
+      "label": "4. Limpiar cache de configuracion",
+      "detail": "Corre esto despues de cambiar config/mavkora.php o el archivo .env",
+      "type": "shell",
+      "command": "docker compose exec app php artisan config:clear",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared" }
+    },
+    {
+      "label": "5. Ver errores en vivo",
+      "detail": "Registro de Laravel en tiempo real. Ctrl+C para salir.",
+      "type": "shell",
+      "command": "docker compose exec app php artisan pail",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+    },
+    {
+      "label": "6. Aplicar migraciones",
+      "detail": "Corre esto cuando agregues una migracion nueva",
+      "type": "shell",
+      "command": "docker compose exec app php artisan migrate",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared" }
+    },
+    {
+      "label": "7. Borrar datos de prueba",
+      "detail": "Borra leads, conversaciones y citas. Conserva tu usuario del panel.",
+      "type": "shell",
+      "command": "docker compose exec app php artisan mavkora:limpiar-pruebas",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared" }
+    },
+    {
+      "label": "8. Apagar Mavkora",
+      "detail": "Apaga los contenedores. La base de datos se conserva.",
+      "type": "shell",
+      "command": "docker compose stop",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared" }
+    }
+  ]
+}

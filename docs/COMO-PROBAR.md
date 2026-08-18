@@ -8,6 +8,33 @@ menú **Terminal → Nueva terminal** (ya se abre en la carpeta correcta).
 
 ---
 
+## 0. La forma más fácil: tareas de VS Code
+
+Si no quieres escribir comandos, todos están guardados como tareas.
+
+1. Presiona **`Ctrl + Shift + P`**
+2. Escribe **`Ejecutar tarea`** (o `Run Task`) y dale Enter
+3. Elige de la lista
+
+| Tarea | Para qué |
+| --- | --- |
+| 1. Arrancar Mavkora | Levanta todo |
+| 2. Probar el bot (conversación de ejemplo) | Corre una conversación completa sola |
+| 3. Conversar con el bot | Modo interactivo: escribes tú |
+| 4. Limpiar caché de configuración | Después de tocar `config/` o `.env` |
+| 5. Ver errores en vivo | Registro de Laravel |
+| 6. Aplicar migraciones | Cuando agregas una migración |
+| 7. Borrar datos de prueba | Deja la base limpia |
+| 8. Apagar Mavkora | Al terminar el día |
+
+> Para la tarea **3**, escribe en el panel de la terminal que se abre abajo,
+> igual que en cualquier terminal.
+
+El resto de esta guía explica los mismos comandos escritos a mano, por si
+prefieres la terminal o necesitas variantes.
+
+---
+
 ## 1. Arrancar todo
 
 ```bash
@@ -147,12 +174,11 @@ confirmación, y el lead debe salir en `/admin/leads` con origen «Formulario we
 **Borrar solo las conversaciones y leads de prueba**, conservando tu usuario:
 
 ```bash
-docker compose exec app php artisan tinker --execute "App\Models\Message::query()->delete(); App\Models\Appointment::query()->delete(); App\Models\Conversation::query()->delete(); App\Models\Lead::query()->delete(); echo 'Datos de prueba borrados';"
+docker compose exec app php artisan mavkora:limpiar-pruebas
 ```
 
-> El orden importa: primero los mensajes, después las citas, luego las
-> conversaciones y por último los leads. Al revés falla, porque unas tablas
-> apuntan a otras.
+Te muestra cuántos registros va a borrar y te pide confirmación. Los usuarios del
+panel no se tocan.
 
 **Borrar toda la base de datos y volver a crearla** (se pierde también tu usuario
 del panel):
