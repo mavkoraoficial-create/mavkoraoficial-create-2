@@ -98,5 +98,6 @@ docker compose exec app php artisan test
 
 ## Documentación
 
+- [Cómo probar](docs/COMO-PROBAR.md) — el día a día: arrancar, probar el bot, y qué volver a correr después de cambiar cada cosa.
 - [Chatbot de WhatsApp](docs/CHATBOT-WHATSAPP.md) — instalación paso a paso, conexión
   con Meta, configuración de n8n y solución de problemas.
